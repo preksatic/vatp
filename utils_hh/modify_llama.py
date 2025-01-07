@@ -45,6 +45,7 @@ class LlamaAttention_heavy_hitter(nn.Module):
 
         self.heavy_budget_ratio = config.heavy_ratio
         self.recent_budget_ratio = config.recent_ratio
+        self.random_small_cache = config.random_small_cache
         self.attention_masks_next = None 
         self.heavy_budget = None
         self.recent_budget = None
@@ -153,6 +154,12 @@ class LlamaAttention_heavy_hitter(nn.Module):
             current_scores_sum=current_scores_sum * self.value_norm
         # offset = attn_weights.gt(0).sum(0).sum(1)
 
+        if self.random_small_cache:
+            num_head, k_token = current_scores_sum.shape
+            perms = torch.argsort(torch.rand(num_head, k_token), dim=-1).to(attn_weights.device)
+            current_scores_sum = current_scores_sum.gather(1, perms)
+
+
         # Accumulate attention scores
         if not self.previous_scores == None:
             current_scores_sum[:, :-1] += self.previous_scores #(Enlarged Sequence)
@@ -178,7 +185,7 @@ class LlamaAttention_heavy_hitter(nn.Module):
 
 
             
-            if self.applyval:
+            if self.applyval or self.random_small_cache:
                 sin_len=self.sink_len
                 current_scores_sum[:, :sin_len] =torch.finfo(current_scores_sum.dtype).max
 

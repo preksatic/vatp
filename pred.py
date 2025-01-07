@@ -29,6 +29,7 @@ def parse_args(args=None):
     parser.add_argument("--recent_ratio", type=float, default=0.1)
     parser.add_argument("--apval", action='store_true', help="apply value norm")
     parser.add_argument("--h2o", action='store_true', help="If true, use the setting of h2o, otherwise ")
+    parser.add_argument('--random_small_cache', action='store_true')
     parser.add_argument("--sink_len", type=int, help="attention sink length")
     return parser.parse_args(args)
 
@@ -63,7 +64,7 @@ def post_process(response, model_name):
         response = response.split("<eoa>")[0]
     return response
 
-def get_pred(rank, world_size, data, max_length, max_gen, prompt_format, dataset, device, model_name, model2path, out_path, apval,sink_len,heavy_ratio,h2o):
+def get_pred(rank, world_size, data, max_length, max_gen, prompt_format, dataset, device, model_name, model2path, out_path, apval,sink_len,heavy_ratio,h2o,random_small_cache):
     device = torch.device(f'cuda:{rank}')
     model, tokenizer = load_model_and_tokenizer(model2path[model_name], model_name, device='cpu')
     config = AutoConfig.from_pretrained(model2path[model_name])
@@ -71,6 +72,7 @@ def get_pred(rank, world_size, data, max_length, max_gen, prompt_format, dataset
     # config.recent_ratio = 0.25
     config.heavy_ratio = heavy_ratio
     config.recent_ratio = heavy_ratio
+    config.random_small_cache = random_small_cache
     config.sink_len=sink_len
     config.layer_ratio=[0.4 for _ in range(32)]
     config.applyval=apval
@@ -203,7 +205,7 @@ if __name__ == '__main__':
         processes = []
         for rank in range(world_size):
             p = mp.Process(target=get_pred, args=(rank, world_size, data_subsets[rank], max_length, \
-                        max_gen, prompt_format, dataset, device, model_name, model2path, out_path, args.apval, args.sink_len, args.heavy_ratio, args.h2o))
+                        max_gen, prompt_format, dataset, device, model_name, model2path, out_path, args.apval, args.sink_len, args.heavy_ratio, args.h2o, args.random_small_cache))
             p.start()
             processes.append(p)
         for p in processes:
